@@ -54,12 +54,12 @@ def get_available_slots(barber_id: int, target_date: date, duration_minutes: int
     if is_day_off:
         return []
 
-    # Existing confirmed bookings for this barber on this date
+    # Existing active bookings (confirmed or rescheduled) for this barber on this date
     booked = list(
         Booking.objects.filter(
             barber_id=barber_id,
             date=target_date,
-            status=Booking.STATUS_CONFIRMED,
+            status__in=Booking.ACTIVE_STATUSES,
         ).values_list("start_time", "end_time")
     )
 

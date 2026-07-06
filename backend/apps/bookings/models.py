@@ -17,6 +17,9 @@ class Booking(models.Model):
         (STATUS_RESCHEDULED, "Rescheduled / Перенесено"),
     ]
 
+    # Statuses that occupy a time slot (block availability / conflict with new bookings)
+    ACTIVE_STATUSES = (STATUS_CONFIRMED, STATUS_RESCHEDULED)
+
     client = models.ForeignKey(User, on_delete=models.PROTECT, related_name="bookings")
     barber = models.ForeignKey(BarberProfile, on_delete=models.PROTECT, related_name="bookings")
     services = models.ManyToManyField(Service, related_name="bookings")

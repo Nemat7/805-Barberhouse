@@ -108,7 +108,7 @@ def cancel_booking(request, pk):
     except Booking.DoesNotExist:
         return Response({"error": "Запись не найдена."}, status=status.HTTP_404_NOT_FOUND)
 
-    if booking.status != Booking.STATUS_CONFIRMED:
+    if booking.status not in Booking.ACTIVE_STATUSES:
         return Response(
             {"error": "Только активные записи можно отменить."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -135,7 +135,7 @@ def reschedule_booking(request, pk):
     except Booking.DoesNotExist:
         return Response({"error": "Запись не найдена."}, status=status.HTTP_404_NOT_FOUND)
 
-    if booking.status != Booking.STATUS_CONFIRMED:
+    if booking.status not in Booking.ACTIVE_STATUSES:
         return Response(
             {"error": "Только активные записи можно перенести."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -326,7 +326,7 @@ def _create_booking_atomic(
         conflicts = Booking.objects.select_for_update().filter(
             barber=barber,
             date=date,
-            status=Booking.STATUS_CONFIRMED,
+            status__in=Booking.ACTIVE_STATUSES,
             start_time__lt=end_time,
             end_time__gt=start_time,
         )
@@ -357,7 +357,7 @@ def _reschedule_atomic(booking: Booking, new_date, new_start, new_end) -> bool:
         conflicts = Booking.objects.select_for_update().filter(
             barber=booking.barber,
             date=new_date,
-            status=Booking.STATUS_CONFIRMED,
+            status__in=Booking.ACTIVE_STATUSES,
             start_time__lt=new_end,
             end_time__gt=new_start,
         ).exclude(pk=booking.pk)

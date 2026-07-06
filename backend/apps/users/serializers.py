@@ -3,14 +3,15 @@ import re
 from rest_framework import serializers
 
 from .models import User
+from .services import normalize_phone
 
 
 def validate_tj_phone(value: str) -> str:
-    """Normalize and validate Tajik phone number (+992XXXXXXXXX)."""
-    cleaned = re.sub(r"[\s\-\(\)]", "", value)
+    """Normalize and validate Tajik phone number. Accepts input with or without +992."""
+    cleaned = normalize_phone(value)
     if not re.fullmatch(r"\+992\d{9}", cleaned):
         raise serializers.ValidationError(
-            "Введите номер в формате +992XXXXXXXXX (9 цифр после кода страны)."
+            "Введите 9-значный номер (например 888887444) или в формате +992XXXXXXXXX."
         )
     return cleaned
 

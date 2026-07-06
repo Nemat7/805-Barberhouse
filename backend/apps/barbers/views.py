@@ -51,11 +51,8 @@ def admin_create_barber(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Normalise phone
-    digits = "".join(c for c in phone if c.isdigit())
-    if not digits.startswith("992"):
-        digits = "992" + digits
-    phone = f"+{digits}"
+    from apps.users.services import normalize_phone
+    phone = normalize_phone(phone)
 
     if User.objects.filter(phone=phone).exists():
         return Response({"error": "A user with this phone already exists."}, status=status.HTTP_400_BAD_REQUEST)

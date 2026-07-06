@@ -41,10 +41,13 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handle);
   }, []);
 
+  const staffRoutes = ["/calendar", "/bookings", "/barbers", "/services"];
+  const onStaffPage = staffRoutes.some((r) => pathname.startsWith(r));
+
   function handleSignOut() {
     logout();
     setDropdownOpen(false);
-    router.push(isStaff ? "/login" : "/");
+    router.push(onStaffPage ? "/login" : "/");
   }
 
   const initials = user?.full_name?.trim()[0]?.toUpperCase() ?? "?";

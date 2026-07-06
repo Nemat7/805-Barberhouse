@@ -12,6 +12,22 @@ from .models import OTPCode, User
 logger = logging.getLogger("sms")
 
 
+# ── Phone normalization ───────────────────────────────────────────────────────
+
+def normalize_phone(raw: str) -> str:
+    """
+    Normalise any user-entered phone to +992XXXXXXXXX.
+    Accepts '888887444', '992888887444', '+992 88 888 74 44', etc.
+    Returns the input stripped if it contains no digits (validation happens elsewhere).
+    """
+    digits = "".join(c for c in raw if c.isdigit())
+    if not digits:
+        return raw.strip()
+    if digits.startswith("992") and len(digits) == 12:
+        return f"+{digits}"
+    return f"+992{digits}"
+
+
 # ── OTP sending ───────────────────────────────────────────────────────────────
 
 def send_otp(phone: str) -> tuple[bool, str | None]:
@@ -20,6 +36,8 @@ def send_otp(phone: str) -> tuple[bool, str | None]:
     Returns (success, error_message).
     In DEBUG mode (without OSONSMS_FORCE_SEND), prints code to console instead.
     """
+    phone = normalize_phone(phone)
+
     # Rate limit: max 3 OTP requests per phone per 10 minutes
     recent = OTPCode.objects.filter(
         phone=phone,
@@ -78,6 +96,7 @@ def verify_otp(phone: str, code: str) -> tuple[bool, str | None]:
     Verify OTP code. Marks it as used on success.
     Returns (success, error_message).
     """
+    phone = normalize_phone(phone)
     try:
         otp = OTPCode.objects.filter(
             phone=phone,
@@ -97,6 +116,7 @@ def verify_otp(phone: str, code: str) -> tuple[bool, str | None]:
 
 def get_or_create_user(phone: str, full_name: str | None = None) -> tuple[User, bool]:
     """Get existing user by phone or create a new client account."""
+    phone = normalize_phone(phone)
     user, created = User.objects.get_or_create(
         phone=phone,
         defaults={

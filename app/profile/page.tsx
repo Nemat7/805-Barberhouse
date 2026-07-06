@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ru as ruLocale } from "date-fns/locale";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { CalendarScheduler } from "@/components/ui/calendar-scheduler";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isStaffUser } from "@/lib/auth";
 import {
   getMyBookings,
   cancelBooking,
@@ -262,13 +263,20 @@ function BookingCard({
 export default function ProfilePage() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user } = useAuth();
+  const router = useRouter();
   const tp = t.profile;
 
   const [bookings, setBookings] = useState<BookingResult[] | null>(null);
   const [loadError, setLoadError] = useState("");
 
+  // The client cabinet is for clients only — staff go to their calendar
+  const isStaff = isStaffUser(user);
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (isAuthenticated && isStaff) router.replace("/calendar");
+  }, [isAuthenticated, isStaff, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isStaff) return;
     getMyBookings()
       .then(setBookings)
       .catch((err) => {
@@ -307,6 +315,9 @@ export default function ProfilePage() {
       prev ? prev.map((b) => (b.id === updated.id ? updated : b)) : prev,
     );
   }
+
+  // Staff being redirected — render nothing to avoid a flash of the client cabinet
+  if (isAuthenticated && isStaff) return null;
 
   // ── Not logged in ──
   if (!isAuthenticated) {

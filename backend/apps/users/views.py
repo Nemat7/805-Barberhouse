@@ -15,7 +15,7 @@ from .serializers import (
     UserProfileSerializer,
     UserListSerializer,
 )
-from .services import send_otp, verify_otp, get_or_create_user
+from .services import send_otp, verify_otp, get_or_create_user, normalize_phone
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ def staff_login(request):
     if not phone or not password:
         return Response({"error": "Телефон и пароль обязательны."}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = authenticate(request, username=phone, password=password)
+    user = authenticate(request, username=normalize_phone(phone), password=password)
     if user is None:
         return Response({"error": "Неверный телефон или пароль."}, status=status.HTTP_401_UNAUTHORIZED)
 
