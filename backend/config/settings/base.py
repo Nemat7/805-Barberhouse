@@ -136,6 +136,7 @@ SPECTACULAR_SETTINGS = {
 
 # ── OsonSMS ───────────────────────────────────────────────────────────────────
 
+OSONSMS_URL = config("OSONSMS_URL", default="https://api.osonsms.com/sendsms_v1.php")
 OSONSMS_TOKEN = config("OSONSMS_TOKEN", default="")
 OSONSMS_LOGIN = config("OSONSMS_LOGIN", default="")
 OSONSMS_SENDER = config("OSONSMS_SENDER", default="BARBERHS")

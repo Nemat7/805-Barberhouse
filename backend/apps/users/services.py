@@ -28,6 +28,57 @@ def normalize_phone(raw: str) -> str:
     return f"+992{digits}"
 
 
+# ── OsonSMS transport ─────────────────────────────────────────────────────────
+
+def _osonsms_send(
+    phone: str,
+    msg: str,
+    txn_id: str,
+    is_confidential: bool = False,
+) -> tuple[bool, str | None]:
+    """
+    Low-level call to the OsonSMS gateway. `phone` may be in any format —
+    the API expects 992XXXXXXXXX with no '+'.
+    Returns (success, user_facing_error_message).
+    """
+    params = {
+        "from": settings.OSONSMS_SENDER,
+        "phone_number": "".join(c for c in phone if c.isdigit()),
+        "msg": msg,
+        "login": settings.OSONSMS_LOGIN,
+        "txn_id": txn_id,
+    }
+    if is_confidential:
+        params["is_confidential"] = "true"
+
+    try:
+        resp = requests.get(
+            settings.OSONSMS_URL,
+            headers={"Authorization": f"Bearer {settings.OSONSMS_TOKEN}"},
+            params=params,
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        logger.error(f"SMS network error to {phone}: {exc}")
+        return False, "SMS-сервис недоступен. Попробуйте позже."
+
+    data = resp.json() if resp.content else {}
+
+    if resp.status_code == 201:
+        logger.info(f"SMS sent to {phone} | msg_id={data.get('msg_id')}")
+        return True, None
+
+    err = data.get("error", {})
+    logger.error(
+        f"SMS failed to {phone} | http={resp.status_code} "
+        f"code={err.get('code')} msg={err.get('msg')}"
+    )
+    # 402/119 = out of balance — worth surfacing distinctly for staff to notice
+    if resp.status_code == 402:
+        return False, "SMS-сервис временно недоступен. Обратитесь к администратору."
+    return False, "Не удалось отправить SMS. Попробуйте ещё раз."
+
+
 # ── OTP sending ───────────────────────────────────────────────────────────────
 
 def send_otp(phone: str) -> tuple[bool, str | None]:
@@ -61,34 +112,13 @@ def send_otp(phone: str) -> tuple[bool, str | None]:
         logger.info(f"[DEV] OTP for {phone}: {code}")
         return True, None
 
-    # Production: send via osonsms
-    try:
-        resp = requests.get(
-            "https://api.osonsms.com/sendsms_v1.php",
-            headers={"Authorization": f"Bearer {settings.OSONSMS_TOKEN}"},
-            params={
-                "from": settings.OSONSMS_SENDER,
-                "phone_number": phone,
-                "msg": f"Ваш код: {code}. Действителен 5 минут.",
-                "login": settings.OSONSMS_LOGIN,
-                "txn_id": txn_id,
-                "is_confidential": "true",  # OTP codes are not saved in osonsms logs
-            },
-            timeout=20,
-        )
-        data = resp.json()
-
-        if resp.status_code == 201:
-            logger.info(f"OTP sent to {phone} | msg_id={data.get('msg_id')}")
-            return True, None
-
-        error_msg = data.get("error", {}).get("msg", "Неизвестная ошибка")
-        logger.error(f"OTP send failed for {phone}: {error_msg}")
-        return False, "Не удалось отправить SMS. Попробуйте ещё раз."
-
-    except requests.RequestException as exc:
-        logger.error(f"OTP network error for {phone}: {exc}")
-        return False, "SMS-сервис недоступен. Попробуйте позже."
+    # Production: send via osonsms (is_confidential → code not stored in their logs)
+    return _osonsms_send(
+        phone,
+        f"Ваш код: {code}. Действителен 5 минут.",
+        txn_id,
+        is_confidential=True,
+    )
 
 
 def verify_otp(phone: str, code: str) -> tuple[bool, str | None]:
@@ -142,24 +172,5 @@ def send_sms(phone: str, message: str, txn_id: str | None = None) -> bool:
         logger.info(f"[DEV] SMS to {phone}: {message}")
         return True
 
-    _txn_id = txn_id or str(uuid.uuid4())
-    try:
-        resp = requests.get(
-            "https://api.osonsms.com/sendsms_v1.php",
-            headers={"Authorization": f"Bearer {settings.OSONSMS_TOKEN}"},
-            params={
-                "from": settings.OSONSMS_SENDER,
-                "phone_number": phone,
-                "msg": message,
-                "login": settings.OSONSMS_LOGIN,
-                "txn_id": _txn_id,
-            },
-            timeout=20,
-        )
-        success = resp.status_code == 201
-        if not success:
-            logger.error(f"SMS failed to {phone}: {resp.json()}")
-        return success
-    except requests.RequestException as exc:
-        logger.error(f"SMS network error to {phone}: {exc}")
-        return False
+    ok, _ = _osonsms_send(phone, message, txn_id or str(uuid.uuid4()))
+    return ok
