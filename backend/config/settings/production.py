@@ -1,6 +1,15 @@
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa
+
+# Never fall back to the local-dev database defaults in production — that
+# surfaces as a confusing "connection to localhost refused" traceback.
+if not DATABASE_URL:  # noqa: F405
+    raise ImproperlyConfigured(
+        "DATABASE_URL is not set. On Railway, add a variable on the web "
+        "service referencing the database: DATABASE_URL=${{Postgres.DATABASE_URL}}"
+    )
 
 
 def _csv(name: str) -> list[str]:
