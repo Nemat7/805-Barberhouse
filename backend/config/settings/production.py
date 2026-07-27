@@ -27,6 +27,13 @@ RAILWAY_DOMAIN = config("RAILWAY_PUBLIC_DOMAIN", default="")
 if RAILWAY_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
 
+if not ALLOWED_HOSTS:
+    # Otherwise Django rejects every request with an opaque 400 and no log line.
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS is empty. Set it to the deployed domain, e.g. "
+        "ALLOWED_HOSTS=my-app.up.railway.app (comma-separated for several)."
+    )
+
 # Django 4+ requires the scheme for CSRF checks (Django admin login).
 CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host != "*"]
 
