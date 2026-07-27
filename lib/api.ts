@@ -1,5 +1,11 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+/** Absolute URL for an uploaded file (barber photos), which the API returns as a path. */
+export function mediaUrl(path: string | null): string | null {
+  if (!path) return null;
+  return path.startsWith("http") ? path : `${BASE}${path}`;
+}
+
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
 export function getAccessToken(): string | null {

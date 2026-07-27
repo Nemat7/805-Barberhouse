@@ -19,6 +19,7 @@ import {
   getServices,
   getAvailability,
   apiErrorMessage,
+  mediaUrl,
   type BookingResult,
   type Barber,
   type Service,
@@ -299,7 +300,6 @@ function WalkinModal({
   t: ReturnType<typeof useLanguage>["t"];
 }) {
   const tw = t.admin.walkin;
-  const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
   const [barberId, setBarberId] = useState<number | null>(barbers.length === 1 ? barbers[0].id : null);
   const [serviceIds, setServiceIds] = useState<Set<number>>(new Set());
@@ -368,7 +368,7 @@ function WalkinModal({
               <Label className="text-xs mb-2 block">{tw.selectBarber}</Label>
               <div className="flex flex-wrap gap-2">
                 {barbers.map((b) => {
-                  const photoUrl = b.photo ? (b.photo.startsWith("http") ? b.photo : `${BASE}${b.photo}`) : null;
+                  const photoUrl = mediaUrl(b.photo);
                   return (
                     <button key={b.id} onClick={() => { setBarberId(b.id); setSlots(undefined); }}
                       className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-colors",
@@ -441,7 +441,6 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const ta = t.admin;
   const isAdmin = isAdminUser(user);
-  const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
   const [date, setDate] = useState(new Date());
   const [allBarbers, setAllBarbers] = useState<Barber[]>([]);
@@ -557,7 +556,7 @@ export default function CalendarPage() {
             {/* Barber columns */}
             {barbers.map((barber, idx) => {
               const photoUrl = barber.photo
-                ? (barber.photo.startsWith("http") ? barber.photo : `${BASE}${barber.photo}`)
+                ? mediaUrl(barber.photo)
                 : null;
 
               return (
