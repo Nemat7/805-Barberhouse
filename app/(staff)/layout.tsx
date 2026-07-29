@@ -96,25 +96,25 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex min-h-screen bg-zinc-50 -mt-16">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-60 bg-zinc-950 fixed inset-y-0 left-0 z-30">
+      {/* Desktop sidebar — sits below the fixed navbar */}
+      <aside className="hidden md:flex flex-col w-60 bg-zinc-950 fixed top-16 bottom-0 left-0 z-30">
         <SidebarContent />
       </aside>
 
-      {/* Mobile overlay */}
+      {/* Mobile drawer — overlays the navbar, so it needs a higher z-index */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-[60] bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-60 bg-zinc-950 flex flex-col md:hidden transition-transform duration-200",
+        "fixed inset-y-0 left-0 z-[70] w-60 bg-zinc-950 flex flex-col md:hidden transition-transform duration-200",
         sidebarOpen ? "translate-x-0" : "-translate-x-full",
       )}>
         <SidebarContent />
       </aside>
 
       {/* Main */}
-      <div className="flex-1 md:ml-60 md:pt-16 flex flex-col">
-        <div className="md:hidden flex items-center justify-between px-4 h-14 bg-zinc-950 sticky top-0 z-20">
+      <div className="flex-1 md:ml-60 pt-16 flex flex-col">
+        <div className="md:hidden flex items-center justify-between px-4 h-14 bg-zinc-950 sticky top-16 z-20">
           <button onClick={() => setSidebarOpen(true)} className="text-white/60 hover:text-white">
             <Menu className="w-5 h-5" />
           </button>

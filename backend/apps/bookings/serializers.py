@@ -62,6 +62,7 @@ class CreateBookingSerializer(serializers.Serializer):
         # Validate services
         services = list(
             Service.objects.filter(pk__in=attrs["service_ids"], is_active=True)
+            .prefetch_related("category_prices")
         )
         if len(services) != len(set(attrs["service_ids"])):
             raise serializers.ValidationError({"service_ids": "Одна или несколько услуг не найдены."})
@@ -73,7 +74,10 @@ class CreateBookingSerializer(serializers.Serializer):
         end_dt = start_dt + timedelta(minutes=total_minutes)
         attrs["total_duration"] = total_minutes
         attrs["end_time"] = end_dt.time()
-        attrs["total_price"] = sum(s.price for s in services)
+        # Priced against the chosen barber's category, never trusting the client
+        attrs["total_price"] = sum(
+            s.price_for(attrs["barber"].category) for s in services
+        )
 
         return attrs
 

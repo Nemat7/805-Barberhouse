@@ -16,6 +16,7 @@ import {
   getAvailability,
   createBookingPublic,
   apiErrorMessage,
+  mediaUrl,
   type Barber,
   type Service,
   type BookingResult,
@@ -114,11 +115,11 @@ export default function BookPage() {
     }
   }, [visibleStep, barbers]);
 
+  // Prices depend on the chosen barber's category, so refetch when it changes.
   useEffect(() => {
-    if (visibleStep >= 3 && services === null) {
-      getServices().then(setServices).catch(() => setServices([]));
-    }
-  }, [visibleStep, services]);
+    if (visibleStep < 3 || !selectedBarberId) return;
+    getServices(selectedBarberId).then(setServices).catch(() => setServices([]));
+  }, [visibleStep, selectedBarberId]);
 
   // ── Step 3 ──────────────────────────────────────────────────────────────────
 
@@ -301,11 +302,19 @@ export default function BookPage() {
                           active ? "bg-white text-black" : "bg-zinc-100 text-black",
                         )}>
                           {b.photo
-                            ? <img src={b.photo} alt={b.full_name} className="w-full h-full object-cover" />
+                            ? <img src={mediaUrl(b.photo) ?? ""} alt={b.full_name} className="w-full h-full object-cover" />
                             : b.full_name[0]
                           }
                         </div>
                         <p className="font-semibold text-sm leading-tight">{b.full_name}</p>
+                        {b.category_display && (
+                          <p className={cn(
+                            "text-[10px] font-bold tracking-wide mt-1",
+                            active ? "text-white/70" : "text-zinc-400",
+                          )}>
+                            {b.category_display.toUpperCase()}
+                          </p>
+                        )}
                         {b.specialty && (
                           <p className={cn("text-xs mt-1 leading-snug", active ? "text-zinc-300" : "text-zinc-500")}>
                             {b.specialty}

@@ -28,9 +28,23 @@ def barber_list(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def service_list(request):
-    """List all active services (public)."""
-    services = Service.objects.filter(is_active=True)
-    return Response(ServiceSerializer(services, many=True).data)
+    """
+    List active services. With ?barber_id=N, `price` is resolved for that
+    barber's category instead of the base price.
+    """
+    services = Service.objects.filter(is_active=True).prefetch_related("category_prices")
+
+    category = None
+    if barber_id := request.query_params.get("barber_id"):
+        category = (
+            BarberProfile.objects.filter(pk=barber_id)
+            .values_list("category", flat=True)
+            .first()
+        )
+
+    return Response(
+        ServiceSerializer(services, many=True, context={"category": category}).data
+    )
 
 
 # ── Admin: barber management (superuser only) ─────────────────────────────────
@@ -64,11 +78,20 @@ def admin_create_barber(request):
         role=User.ROLE_BARBER,
     )
 
-    specialty = request.data.get("specialty", "")
-    bio       = request.data.get("bio", "")
+    payload = {
+        "specialty": request.data.get("specialty", ""),
+        "bio": request.data.get("bio", ""),
+        "category": request.data.get("category", BarberProfile.CATEGORY_BARBER),
+        "is_active": True,
+    }
+    if photo := request.FILES.get("photo"):
+        payload["photo"] = photo
 
-    serializer = BarberSerializer(data={"specialty": specialty, "bio": bio, "is_active": True})
-    serializer.is_valid(raise_exception=True)
+    serializer = BarberSerializer(data=payload)
+    if not serializer.is_valid():
+        # The user row is already created; drop it so the phone stays free.
+        user.delete()
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     barber = serializer.save(user=user)
 
     return Response(BarberSerializer(barber).data, status=status.HTTP_201_CREATED)

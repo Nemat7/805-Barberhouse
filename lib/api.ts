@@ -56,8 +56,11 @@ async function apiFetch<T>(
   retry = true,
 ): Promise<T> {
   const token = getAccessToken();
+  // For FormData the browser must set Content-Type itself, so it carries the
+  // multipart boundary — setting it manually breaks the upload.
+  const isFormData = opts.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(opts.headers as Record<string, string>),
   };
@@ -100,11 +103,27 @@ async function tryRefresh(): Promise<boolean> {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/** Barber tiers. Service prices differ per tier — see Service.prices. */
+export type BarberCategory = "barber" | "pro" | "top" | "brend";
+
+export const BARBER_CATEGORIES: { value: BarberCategory; label: string }[] = [
+  { value: "barber", label: "BARBER" },
+  { value: "pro",    label: "PRO BARBER" },
+  { value: "top",    label: "TOP BARBER" },
+  { value: "brend",  label: "BREND BARBER" },
+];
+
+export function categoryLabel(category: string): string {
+  return BARBER_CATEGORIES.find((c) => c.value === category)?.label ?? category;
+}
+
 export interface Barber {
   id: number;
   full_name: string;
   phone: string;
   photo: string | null;
+  category: BarberCategory;
+  category_display: string;
   specialty: string;
   bio: string;
   is_active: boolean;
@@ -116,7 +135,10 @@ export interface Service {
   name_en: string;
   description_ru: string;
   description_en: string;
+  /** Base price, or the price for the barber passed to getServices(). */
   price: string;
+  /** Price per barber category. */
+  prices: Record<BarberCategory, string>;
   duration_minutes: number;
   is_active: boolean;
   order: number;
@@ -216,8 +238,10 @@ export async function getBarbers(): Promise<Barber[]> {
   return apiFetch("/api/v1/barbers/");
 }
 
-export async function getServices(): Promise<Service[]> {
-  return apiFetch("/api/v1/services/");
+/** Pass a barberId to get prices for that barber's category. */
+export async function getServices(barberId?: number | null): Promise<Service[]> {
+  const q = barberId ? `?barber_id=${barberId}` : "";
+  return apiFetch(`/api/v1/services/${q}`);
 }
 
 // ── Availability ──────────────────────────────────────────────────────────────
@@ -351,26 +375,44 @@ export async function adminCreateBooking(payload: {
 
 // ── Admin: barbers ────────────────────────────────────────────────────────────
 
+/** Builds FormData so an optional photo File can ride along with the fields. */
+function barberFormData(data: Record<string, string | File | boolean | undefined | null>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined || value === null) continue;
+    fd.append(key, value instanceof File ? value : String(value));
+  }
+  return fd;
+}
+
 export async function adminCreateBarber(data: {
   full_name: string;
   phone: string;
   password: string;
+  category?: BarberCategory;
   specialty?: string;
   bio?: string;
+  photo?: File | null;
 }): Promise<Barber> {
   return apiFetch("/api/v1/admin/barbers/", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: barberFormData(data),
   });
 }
 
 export async function adminUpdateBarber(
   pk: number,
-  data: { specialty?: string; bio?: string; is_active?: boolean },
+  data: {
+    category?: BarberCategory;
+    specialty?: string;
+    bio?: string;
+    is_active?: boolean;
+    photo?: File | null;
+  },
 ): Promise<Barber> {
   return apiFetch(`/api/v1/admin/barbers/${pk}/`, {
     method: "PATCH",
-    body: JSON.stringify(data),
+    body: barberFormData(data),
   });
 }
 
@@ -423,6 +465,7 @@ export async function adminCreateService(data: {
   description_ru: string;
   description_en: string;
   price: string;
+  prices?: Partial<Record<BarberCategory, string>>;
   duration_minutes: number;
   order?: number;
 }): Promise<Service> {
@@ -434,7 +477,7 @@ export async function adminCreateService(data: {
 
 export async function adminUpdateService(
   pk: number,
-  data: Partial<Service>,
+  data: Partial<Omit<Service, "prices">> & { prices?: Partial<Record<BarberCategory, string>> },
 ): Promise<Service> {
   return apiFetch(`/api/v1/admin/services/${pk}/`, {
     method: "PATCH",

@@ -14,10 +14,70 @@ import {
   adminCreateOverride,
   adminDeleteOverride,
   apiErrorMessage,
+  mediaUrl,
+  BARBER_CATEGORIES,
   Barber,
+  BarberCategory,
   WeeklySchedule,
   ScheduleOverride,
 } from "@/lib/api";
+
+// ── Photo picker ──────────────────────────────────────────────────────────────
+
+function PhotoPicker({
+  currentUrl,
+  file,
+  onPick,
+  fallback,
+}: {
+  currentUrl?: string | null;
+  file: File | null;
+  onPick: (f: File | null) => void;
+  fallback: string;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) { setPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const shown = preview ?? currentUrl ?? null;
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-100 flex-shrink-0 flex items-center justify-center">
+        {shown ? (
+          <img src={shown} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-zinc-400 font-semibold text-lg">{fallback}</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="cursor-pointer text-sm text-zinc-700 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors">
+          Выбрать фото
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        {file && (
+          <button
+            type="button"
+            onClick={() => onPick(null)}
+            className="text-xs text-zinc-400 hover:text-red-500 transition-colors text-left"
+          >
+            Убрать
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Time input ────────────────────────────────────────────────────────────────
 
@@ -289,18 +349,26 @@ function BarberCard({ barber, onUpdated }: { barber: Barber; onUpdated: (b: Barb
   // Info form
   const [specialty, setSpecialty] = useState(barber.specialty);
   const [bio, setBio] = useState(barber.bio);
+  const [category, setCategory] = useState<BarberCategory>(barber.category);
   const [isActive, setIsActive] = useState(barber.is_active);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   async function save() {
     setSaving(true);
+    setError("");
     try {
-      const updated = await adminUpdateBarber(barber.id, { specialty, bio, is_active: isActive });
+      const updated = await adminUpdateBarber(barber.id, {
+        specialty, bio, category, is_active: isActive, photo,
+      });
       onUpdated(updated);
+      setPhoto(null);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {
+    } catch (err) {
+      setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -315,7 +383,7 @@ function BarberCard({ barber, onUpdated }: { barber: Barber; onUpdated: (b: Barb
       >
         <div className="w-10 h-10 rounded-full bg-zinc-100 overflow-hidden flex-shrink-0">
           {barber.photo ? (
-            <img src={barber.photo} alt={barber.full_name} className="w-full h-full object-cover" />
+            <img src={mediaUrl(barber.photo) ?? ""} alt={barber.full_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-400 font-semibold text-sm">
               {barber.full_name[0]}
@@ -323,8 +391,11 @@ function BarberCard({ barber, onUpdated }: { barber: Barber; onUpdated: (b: Barb
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-zinc-900 text-sm">{barber.full_name}</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-zinc-900 text-white tracking-wide">
+              {barber.category_display?.toUpperCase() ?? ""}
+            </span>
             <span className={cn("text-xs px-1.5 py-0.5 rounded-full", barber.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500")}>
               {barber.is_active ? "Active" : "Inactive"}
             </span>
@@ -358,6 +429,24 @@ function BarberCard({ barber, onUpdated }: { barber: Barber; onUpdated: (b: Barb
           <div className="px-5 py-5">
             {tab === "info" && (
               <div className="space-y-4">
+                <PhotoPicker
+                  currentUrl={mediaUrl(barber.photo)}
+                  file={photo}
+                  onPick={(f) => { setPhoto(f); setSaved(false); }}
+                  fallback={barber.full_name[0]}
+                />
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1.5 block">Категория</label>
+                  <select
+                    value={category}
+                    onChange={(e) => { setCategory(e.target.value as BarberCategory); setSaved(false); }}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black/20"
+                  >
+                    {BARBER_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="text-xs text-zinc-500 mb-1.5 block">{tb.specialty}</label>
                   <input
@@ -385,6 +474,7 @@ function BarberCard({ barber, onUpdated }: { barber: Barber; onUpdated: (b: Barb
                   />
                   <span className="text-sm text-zinc-700">{tb.isActive}</span>
                 </label>
+                {error && <p className="text-sm text-red-600">{error}</p>}
                 <button
                   onClick={save}
                   disabled={saving}
@@ -422,8 +512,10 @@ function CreateBarberModal({
   const [fullName, setFullName]   = useState("");
   const [phone, setPhone]         = useState("");
   const [password, setPassword]   = useState("");
+  const [category, setCategory]   = useState<BarberCategory>("barber");
   const [specialty, setSpecialty] = useState("");
   const [bio, setBio]             = useState("");
+  const [photo, setPhoto]         = useState<File | null>(null);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
 
@@ -432,7 +524,9 @@ function CreateBarberModal({
     setError("");
     setLoading(true);
     try {
-      const barber = await adminCreateBarber({ full_name: fullName, phone, password, specialty, bio });
+      const barber = await adminCreateBarber({
+        full_name: fullName, phone, password, category, specialty, bio, photo,
+      });
       onCreated(barber);
       onClose();
     } catch (err) {
@@ -452,7 +546,13 @@ function CreateBarberModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-5 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-5 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          <PhotoPicker
+            file={photo}
+            onPick={setPhoto}
+            fallback={fullName.trim()[0]?.toUpperCase() ?? "?"}
+          />
+
           <div className="space-y-1.5">
             <label className="text-xs text-zinc-500 block">Полное имя *</label>
             <input
@@ -487,6 +587,20 @@ function CreateBarberModal({
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/20"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs text-zinc-500 block">Категория *</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as BarberCategory)}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black/20"
+            >
+              {BARBER_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-zinc-400">Определяет цены услуг для этого барбера.</p>
           </div>
 
           <div className="space-y-1.5">

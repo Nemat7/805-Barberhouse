@@ -403,6 +403,22 @@ function WalkinModal({
             </div>
           </div>
 
+          {barberId && serviceIds.size > 0 && (() => {
+            const category = barbers.find((b) => b.id === barberId)?.category ?? "barber";
+            const chosen = services.filter((s) => serviceIds.has(s.id));
+            const total = chosen.reduce(
+              (sum, s) => sum + parseFloat(s.prices?.[category] ?? s.price), 0,
+            );
+            const minutes = chosen.reduce((sum, s) => sum + s.duration_minutes, 0);
+            return (
+              <div className="rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2 text-sm">
+                <span className="text-zinc-500">{language === "ru" ? "Итого" : "Total"}: </span>
+                <span className="font-semibold text-zinc-900">{total} сом</span>
+                <span className="text-zinc-400"> · {minutes} мин</span>
+              </div>
+            );
+          })()}
+
           <div className="space-y-1.5">
             <Label className="text-xs">{tw.notes}</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} />

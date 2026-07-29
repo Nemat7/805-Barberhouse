@@ -1,24 +1,77 @@
 from rest_framework import serializers
 
-from .models import BarberProfile, ScheduleOverride, Service, WeeklySchedule
+from .models import BarberProfile, ScheduleOverride, Service, ServicePrice, WeeklySchedule
 
 
 class ServiceSerializer(serializers.ModelSerializer):
+    """
+    `price` is the base price — or, when the serializer is given a `category`
+    in context, the price for that barber category. `prices` carries the full
+    per-category map, and is writable so admin screens can edit every tier.
+    """
+    prices = serializers.DictField(
+        child=serializers.DecimalField(max_digits=10, decimal_places=2),
+        required=False,
+    )
+
     class Meta:
         model = Service
         fields = [
             "id", "name_ru", "name_en", "description_ru", "description_en",
-            "price", "duration_minutes", "is_active", "order",
+            "price", "prices", "duration_minutes", "is_active", "order",
         ]
+
+    def validate_prices(self, value):
+        valid = {key for key, _ in BarberProfile.CATEGORY_CHOICES}
+        unknown = set(value) - valid
+        if unknown:
+            raise serializers.ValidationError(
+                f"Unknown categories: {', '.join(sorted(unknown))}."
+            )
+        return value
+
+    def _save_prices(self, service, prices):
+        for category, price in prices.items():
+            ServicePrice.objects.update_or_create(
+                service=service, category=category, defaults={"price": price}
+            )
+
+    def create(self, validated_data):
+        prices = validated_data.pop("prices", {})
+        service = super().create(validated_data)
+        self._save_prices(service, prices)
+        return service
+
+    def update(self, instance, validated_data):
+        prices = validated_data.pop("prices", None)
+        service = super().update(instance, validated_data)
+        if prices is not None:
+            self._save_prices(service, prices)
+        return service
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        by_category = {cp.category: str(cp.price) for cp in instance.category_prices.all()}
+        data["prices"] = {
+            key: by_category.get(key, str(instance.price))
+            for key, _ in BarberProfile.CATEGORY_CHOICES
+        }
+        if category := self.context.get("category"):
+            data["price"] = str(instance.price_for(category))
+        return data
 
 
 class BarberSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="user.full_name", read_only=True)
     phone = serializers.CharField(source="user.phone", read_only=True)
+    category_display = serializers.CharField(source="get_category_display", read_only=True)
 
     class Meta:
         model = BarberProfile
-        fields = ["id", "full_name", "phone", "photo", "specialty", "bio", "is_active"]
+        fields = [
+            "id", "full_name", "phone", "photo", "category", "category_display",
+            "specialty", "bio", "is_active",
+        ]
 
 
 class WeeklyScheduleSerializer(serializers.ModelSerializer):

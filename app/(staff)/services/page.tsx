@@ -7,30 +7,48 @@ import {
   adminGetServices,
   adminCreateService,
   adminUpdateService,
+  BARBER_CATEGORIES,
+  BarberCategory,
   Service,
 } from "@/lib/api";
 
 // ── Service form ──────────────────────────────────────────────────────────────
+
+type PriceMap = Record<BarberCategory, string>;
 
 interface ServiceFormData {
   name_ru: string;
   name_en: string;
   description_ru: string;
   description_en: string;
-  price: string;
+  prices: PriceMap;
   duration_minutes: number;
   is_active: boolean;
 }
+
+const emptyPrices = (): PriceMap => ({ barber: "", pro: "", top: "", brend: "" });
 
 const emptyForm = (): ServiceFormData => ({
   name_ru: "",
   name_en: "",
   description_ru: "",
   description_en: "",
-  price: "",
+  prices: emptyPrices(),
   duration_minutes: 30,
   is_active: true,
 });
+
+/**
+ * The API keeps a base `price` for fallback; we mirror the BARBER tier into it
+ * so a service always has a sensible price even before tiers are filled in.
+ */
+function toPayload(form: ServiceFormData) {
+  const { prices, ...rest } = form;
+  const filled = Object.fromEntries(
+    Object.entries(prices).filter(([, v]) => v.trim() !== ""),
+  ) as Partial<PriceMap>;
+  return { ...rest, price: prices.barber || prices.pro || prices.top || prices.brend, prices: filled };
+}
 
 function ServiceForm({
   initial,
@@ -50,7 +68,11 @@ function ServiceForm({
 }) {
   const [form, setForm] = useState<ServiceFormData>(initial);
 
-  function field(key: keyof ServiceFormData, label: string, type: "text" | "number" | "textarea" = "text") {
+  function field(
+    key: Exclude<keyof ServiceFormData, "prices">,
+    label: string,
+    type: "text" | "number" | "textarea" = "text",
+  ) {
     return (
       <div key={key}>
         <label className="text-xs text-zinc-500 mb-1.5 block">{label}</label>
@@ -80,8 +102,31 @@ function ServiceForm({
         {field("name_en", labels.nameEn)}
         {field("description_ru", labels.descRu, "textarea")}
         {field("description_en", labels.descEn, "textarea")}
-        {field("price", labels.price)}
         {field("duration_minutes", labels.duration, "number")}
+      </div>
+
+      <div>
+        <label className="text-xs text-zinc-500 mb-1.5 block">
+          {labels.price} — по категориям барберов (сом)
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {BARBER_CATEGORIES.map((c) => (
+            <div key={c.value}>
+              <span className="block text-[10px] font-semibold text-zinc-400 mb-1 tracking-wide">
+                {c.label}
+              </span>
+              <input
+                inputMode="decimal"
+                value={form.prices[c.value]}
+                onChange={(e) =>
+                  setForm({ ...form, prices: { ...form.prices, [c.value]: e.target.value } })
+                }
+                placeholder="0"
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/20"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">
@@ -103,7 +148,10 @@ function ServiceForm({
         </button>
         <button
           onClick={() => onSave(form)}
-          disabled={saving || !form.name_ru.trim() || !form.name_en.trim() || !form.price.trim()}
+          disabled={
+            saving || !form.name_ru.trim() || !form.name_en.trim() ||
+            !Object.values(form.prices).some((p) => p.trim())
+          }
           className="flex-1 py-2.5 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -137,7 +185,7 @@ function ServiceRow({
   async function save(data: ServiceFormData) {
     setSaving(true);
     try {
-      const updated = await adminUpdateService(service.id, data);
+      const updated = await adminUpdateService(service.id, toPayload(data));
       onUpdated(updated);
       setEditing(false);
     } catch {
@@ -171,10 +219,16 @@ function ServiceRow({
                   <span className="text-xs px-1.5 py-0.5 rounded-full bg-zinc-100 text-zinc-400">Inactive</span>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-xs text-zinc-400">
-                <span>{service.duration_minutes} min</span>
-                <span>·</span>
-                <span className="font-medium text-zinc-700">{service.price} сом</span>
+              <div className="text-xs text-zinc-400 mb-1.5">{service.duration_minutes} min</div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {BARBER_CATEGORIES.map((c) => (
+                  <span key={c.value} className="text-[11px] text-zinc-500">
+                    <span className="text-zinc-400">{c.label}</span>{" "}
+                    <span className="font-semibold text-zinc-800">
+                      {service.prices?.[c.value] ?? service.price} сом
+                    </span>
+                  </span>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -214,7 +268,7 @@ function ServiceRow({
                 name_en: service.name_en,
                 description_ru: service.description_ru,
                 description_en: service.description_en,
-                price: service.price,
+                prices: { ...emptyPrices(), ...(service.prices ?? {}) },
                 duration_minutes: service.duration_minutes,
                 is_active: service.is_active,
               }}
@@ -256,7 +310,7 @@ export default function ServicesPage() {
     setSavingNew(true);
     try {
       const created = await adminCreateService({
-        ...data,
+        ...toPayload(data),
         order: services.length + 1,
       });
       setServices((prev) => [...prev, created]);

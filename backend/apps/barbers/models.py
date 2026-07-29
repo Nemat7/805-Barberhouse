@@ -14,9 +14,25 @@ DAYS_OF_WEEK = [
 
 
 class BarberProfile(models.Model):
+    CATEGORY_BARBER = "barber"
+    CATEGORY_PRO = "pro"
+    CATEGORY_TOP = "top"
+    CATEGORY_BREND = "brend"
+
+    # Service prices differ per category — see ServicePrice.
+    CATEGORY_CHOICES = [
+        (CATEGORY_BARBER, "Barber"),
+        (CATEGORY_PRO, "Pro Barber"),
+        (CATEGORY_TOP, "Top Barber"),
+        (CATEGORY_BREND, "Brend Barber"),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="barber_profile")
     photo = models.ImageField(upload_to="barbers/", null=True, blank=True)
-    specialty = models.CharField(max_length=200)
+    category = models.CharField(
+        max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_BARBER, db_index=True
+    )
+    specialty = models.CharField(max_length=200, blank=True)
     bio = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
@@ -35,7 +51,10 @@ class Service(models.Model):
     name_en = models.CharField(max_length=100)
     description_ru = models.TextField(blank=True)
     description_en = models.TextField(blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Price in somoni")
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="Base price in somoni — used when no category price is set",
+    )
     duration_minutes = models.PositiveIntegerField()
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0, help_text="Display order")
@@ -47,8 +66,34 @@ class Service(models.Model):
         verbose_name = "Service"
         verbose_name_plural = "Services"
 
+    def price_for(self, category: str):
+        """Price for a barber category, falling back to the base price."""
+        for cp in self.category_prices.all():
+            if cp.category == category:
+                return cp.price
+        return self.price
+
     def __str__(self):
         return f"{self.name_ru} — {self.price} сомони ({self.duration_minutes} мин)"
+
+
+class ServicePrice(models.Model):
+    """Price of one service for one barber category."""
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="category_prices"
+    )
+    category = models.CharField(max_length=20, choices=BarberProfile.CATEGORY_CHOICES)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        app_label = "barbers"
+        db_table = "service_prices"
+        unique_together = ["service", "category"]
+        verbose_name = "Service Price"
+        verbose_name_plural = "Service Prices"
+
+    def __str__(self):
+        return f"{self.service.name_ru} / {self.get_category_display()} — {self.price}"
 
 
 class WeeklySchedule(models.Model):
