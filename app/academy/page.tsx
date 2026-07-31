@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
-import { Check, Scissors, BookOpen, Award, ChevronRight, Instagram } from "lucide-react";
+import { Check, Scissors, BookOpen, Award, ChevronRight, Instagram, Loader2 } from "lucide-react";
+import { applyToAcademy, apiErrorMessage, type AcademyProgram } from "@/lib/api";
 
 // ── Static data (non-translated) ──────────────────────────────────────────────
 
@@ -49,6 +50,38 @@ export default function AcademyPage() {
   const ta = t.academy;
 
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [program, setProgram] = useState<AcademyProgram>("undecided");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const enrollRef = useRef<HTMLElement>(null);
+
+  /** "Apply" on a program card preselects it, then scrolls to the form. */
+  function applyForProgram(id: AcademyProgram) {
+    setProgram(id);
+    enrollRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function handleApply(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError("");
+    setSubmitting(true);
+    try {
+      await applyToAcademy({
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        program,
+        message: message.trim(),
+      });
+      setFormSubmitted(true);
+    } catch (err) {
+      setFormError(apiErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   // Merge static + translated program data
   const programs = programsStatic.map((p) => ({
@@ -206,11 +239,11 @@ export default function AcademyPage() {
                 </CardContent>
                 <CardFooter className="mt-auto">
                   <Button
-                    asChild
+                    onClick={() => applyForProgram(program.id)}
                     variant={program.badgeLabel ? "default" : "outline"}
                     className={cn("w-full", program.badgeLabel ? "bg-black text-white hover:bg-zinc-800" : "")}
                   >
-                    <a href="#enroll">{ta.applyForProgram}</a>
+                    {ta.applyForProgram}
                   </Button>
                 </CardFooter>
               </Card>
@@ -309,7 +342,7 @@ export default function AcademyPage() {
       </section>
 
       {/* ── Enrollment Form ── */}
-      <section id="enroll" className="bg-white py-12 sm:py-24 px-4 sm:px-6">
+      <section id="enroll" ref={enrollRef} className="bg-white py-12 sm:py-24 px-4 sm:px-6">
         <div className="max-w-2xl mx-auto">
           {formSubmitted ? (
             <div className="text-center py-12">
@@ -331,19 +364,46 @@ export default function AcademyPage() {
                 <p className="text-zinc-500">{ta.enrollSubtitle}</p>
               </div>
 
-              <form
-                onSubmit={(e) => { e.preventDefault(); setFormSubmitted(true); }}
-                className="space-y-5"
-              >
+              <form onSubmit={handleApply} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label htmlFor="enroll-name">{ta.fullName}</Label>
-                    <Input id="enroll-name" placeholder={ta.fullNamePlaceholder} required />
+                    <Input
+                      id="enroll-name"
+                      placeholder={ta.fullNamePlaceholder}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="enroll-phone">{ta.phone}</Label>
-                    <Input id="enroll-phone" type="tel" placeholder={ta.phonePlaceholder} required />
+                    <Input
+                      id="enroll-phone"
+                      type="tel"
+                      placeholder={ta.phonePlaceholder}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="enroll-program">{ta.programOfInterest}</Label>
+                  <select
+                    id="enroll-program"
+                    value={program}
+                    onChange={(e) => setProgram(e.target.value as AcademyProgram)}
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm shadow-black/5 transition-shadow focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/20"
+                  >
+                    {programsStatic.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {ta.programs[p.id as keyof typeof ta.programs].name}
+                      </option>
+                    ))}
+                    <option value="undecided">{ta.notSureYet}</option>
+                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -355,17 +415,28 @@ export default function AcademyPage() {
                     id="enroll-message"
                     rows={4}
                     placeholder={ta.tellUsPlaceholder}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
                     className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm shadow-black/5 transition-shadow placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/20 resize-none"
                   />
                 </div>
 
+                {formError && <p className="text-sm text-red-600">{formError}</p>}
+
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full h-12 bg-black text-white hover:bg-zinc-800 text-base"
+                  disabled={submitting || !fullName.trim() || !phone.trim()}
+                  className="w-full h-12 bg-black text-white hover:bg-zinc-800 text-base disabled:opacity-50"
                 >
-                  {ta.submitApplication}
-                  <ChevronRight className="ml-2 h-4 w-4" />
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      {ta.submitApplication}
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </form>
             </>

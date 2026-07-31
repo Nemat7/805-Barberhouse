@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.barbers",
     "apps.bookings",
+    "apps.academy",
 ]
 
 MIDDLEWARE = [
@@ -224,6 +225,10 @@ LOGGING = {
             "handlers": ["errors_file", "console"],
             "level": "ERROR",
             "propagate": False,
+        },
+        "academy": {
+            "handlers": ["console", "bookings_file"],
+            "level": "INFO",
         },
         "bookings": {
             "handlers": ["console", "bookings_file"],

@@ -484,3 +484,62 @@ export async function adminUpdateService(
     body: JSON.stringify(data),
   });
 }
+
+// ── Academy applications ──────────────────────────────────────────────────────
+
+export type AcademyProgram = "little-barber" | "barber" | "top-barber" | "undecided";
+export type AcademyStatus = "new" | "contacted" | "enrolled" | "rejected";
+
+export const ACADEMY_STATUSES: AcademyStatus[] = ["new", "contacted", "enrolled", "rejected"];
+
+export interface AcademyApplication {
+  id: number;
+  full_name: string;
+  phone: string;
+  program: AcademyProgram;
+  program_display: string;
+  message: string;
+  status: AcademyStatus;
+  status_display: string;
+  admin_notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Public — submit an application from the Academy page. */
+export async function applyToAcademy(data: {
+  full_name: string;
+  phone: string;
+  program: AcademyProgram;
+  message?: string;
+}): Promise<AcademyApplication> {
+  return apiFetch("/api/v1/academy/applications/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminGetApplications(params: {
+  status?: string;
+  program?: string;
+} = {}): Promise<AcademyApplication[]> {
+  const q = new URLSearchParams();
+  if (params.status) q.set("status", params.status);
+  if (params.program) q.set("program", params.program);
+  const qs = q.toString();
+  return apiFetch(`/api/v1/admin/academy/applications/${qs ? `?${qs}` : ""}`);
+}
+
+export async function adminUpdateApplication(
+  pk: number,
+  data: { status?: AcademyStatus; admin_notes?: string },
+): Promise<AcademyApplication> {
+  return apiFetch(`/api/v1/admin/academy/applications/${pk}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminDeleteApplication(pk: number): Promise<void> {
+  await apiFetch(`/api/v1/admin/academy/applications/${pk}/`, { method: "DELETE" });
+}

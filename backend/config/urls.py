@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/v1/auth/", include("apps.users.urls")),
     path("api/v1/", include("apps.barbers.urls")),
     path("api/v1/", include("apps.bookings.urls")),
+    path("api/v1/", include("apps.academy.urls")),
 
     # Auto-generated API docs (Swagger UI)
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

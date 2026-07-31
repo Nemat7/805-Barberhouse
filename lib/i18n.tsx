@@ -103,7 +103,25 @@ const translations = {
     admin: {
       loading: "Загрузка...",
       accessDenied: "Доступ запрещён",
-      nav: { calendar: "Расписание", bookings: "Записи", barbers: "Барберы", services: "Услуги" },
+      nav: { calendar: "Расписание", bookings: "Записи", barbers: "Барберы", services: "Услуги", academy: "Академия" },
+      applications: {
+        title: "Заявки в Академию",
+        empty: "Пока нет заявок.",
+        program: "Программа",
+        submitted: "Отправлена",
+        notes: "Заметки",
+        notesPlaceholder: "Внутренние заметки...",
+        saveNotes: "Сохранить",
+        delete: "Удалить",
+        confirmDelete: "Удалить заявку?",
+        all: "Все",
+        statusLabels: {
+          new: "Новая",
+          contacted: "Связались",
+          enrolled: "Зачислен",
+          rejected: "Отклонена",
+        },
+      },
       calendar: {
         title: "Расписание",
         today: "Сегодня",
@@ -435,7 +453,25 @@ const translations = {
     admin: {
       loading: "Loading...",
       accessDenied: "Access denied",
-      nav: { calendar: "Schedule", bookings: "Bookings", barbers: "Barbers", services: "Services" },
+      nav: { calendar: "Schedule", bookings: "Bookings", barbers: "Barbers", services: "Services", academy: "Academy" },
+      applications: {
+        title: "Academy Applications",
+        empty: "No applications yet.",
+        program: "Program",
+        submitted: "Submitted",
+        notes: "Notes",
+        notesPlaceholder: "Internal notes...",
+        saveNotes: "Save",
+        delete: "Delete",
+        confirmDelete: "Delete this application?",
+        all: "All",
+        statusLabels: {
+          new: "New",
+          contacted: "Contacted",
+          enrolled: "Enrolled",
+          rejected: "Rejected",
+        },
+      },
       calendar: {
         title: "Schedule",
         today: "Today",

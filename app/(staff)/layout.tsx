@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, List, Scissors, Star, LogOut, Menu } from "lucide-react";
+import { CalendarDays, List, Scissors, Star, GraduationCap, LogOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useAuth, isStaffUser, isAdminUser } from "@/lib/auth";
@@ -43,6 +43,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     ...(isAdmin ? [
       { href: "/barbers", icon: Scissors, label: ta.nav.barbers },
       { href: "/services", icon: Star,    label: ta.nav.services },
+      { href: "/applications", icon: GraduationCap, label: ta.nav.academy },
     ] : []),
   ];
 
